@@ -1,10 +1,17 @@
 const gameBoard = document.querySelector(".game-board");
 const scoreValue = document.querySelector(".score__value");
+const restartButton = document.querySelector(".restart-button");
+const undoButton = document.querySelector(".undo-button");
+const gameOverOverlay = document.querySelector(".game-over-overlay");
+const gameOverScoreValue = document.querySelector(".game-over__score-value");
+const gameOverRestartButton = document.querySelector(".game-over__restart");
 
 const BOARD_SIZE = 4;
 
 let board = [];
 let score = 0;
+let previousState = null;
+let gameOver = false;
 let touchStartX = 0;
 let touchStartY = 0;
 
@@ -267,7 +274,53 @@ function boardsAreEqual(firstBoard, secondBoard) {
     return true;
 }
 
+function hasAvailableMoves() {
+    if (getEmptyCells().length > 0) {
+        return true;
+    }
+
+    for (let row = 0; row < BOARD_SIZE; row++) {
+        for (let column = 0; column < BOARD_SIZE; column++) {
+            const currentValue = board[row][column];
+
+            if (
+                column + 1 < BOARD_SIZE &&
+                currentValue === board[row][column + 1]
+            ) {
+                return true;
+            }
+
+            if (
+                row + 1 < BOARD_SIZE &&
+                currentValue === board[row + 1][column]
+            ) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+function finishGame() {
+    gameOver = true;
+    previousState = null;
+
+    undoButton.disabled = true;
+
+    gameOverScoreValue.textContent = score;
+    gameOverOverlay.classList.add("game-over-overlay--open");
+}
+
+function closeGameOver() {
+    gameOverOverlay.classList.remove("game-over-overlay--open");
+}
+
 function move(direction) {
+    if (gameOver) {
+        return false;
+    }
+
     let result;
 
     if (direction === "left") {
@@ -294,13 +347,39 @@ function move(direction) {
         return false;
     }
 
+    previousState = {
+        board: cloneBoard(board),
+        score: score
+    };
+
     board = result.board;
     score += result.scoreGain;
 
     addRandomTiles();
     renderBoard();
 
+    undoButton.disabled = false;
+
+    if (!hasAvailableMoves()) {
+        finishGame();
+    }
+
     return true;
+}
+
+function undoMove() {
+    if (!previousState || gameOver) {
+        return;
+    }
+
+    board = cloneBoard(previousState.board);
+    score = previousState.score;
+
+    previousState = null;
+
+    renderBoard();
+
+    undoButton.disabled = true;
 }
 
 function handleKeydown(event) {
@@ -365,6 +444,12 @@ function handleTouchEnd(event) {
 function startGame() {
     board = createEmptyBoard();
     score = 0;
+    previousState = null;
+    gameOver = false;
+
+    closeGameOver();
+
+    undoButton.disabled = true;
 
     createBoardCells();
     addInitialTiles();
@@ -375,5 +460,9 @@ document.addEventListener("keydown", handleKeydown);
 
 gameBoard.addEventListener("touchstart", handleTouchStart);
 gameBoard.addEventListener("touchend", handleTouchEnd);
+
+restartButton.addEventListener("click", startGame);
+gameOverRestartButton.addEventListener("click", startGame);
+undoButton.addEventListener("click", undoMove);
 
 startGame();
