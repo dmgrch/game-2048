@@ -7,6 +7,7 @@ const gameOverScoreValue = document.querySelector(".game-over__score-value");
 const gameOverRestartButton = document.querySelector(".game-over__restart");
 
 const BOARD_SIZE = 4;
+const GAME_STORAGE_KEY = "game2048";
 
 let board = [];
 let score = 0;
@@ -364,6 +365,8 @@ function move(direction) {
         finishGame();
     }
 
+    saveGame();
+
     return true;
 }
 
@@ -380,6 +383,8 @@ function undoMove() {
     renderBoard();
 
     undoButton.disabled = true;
+
+    saveGame();
 }
 
 function handleKeydown(event) {
@@ -441,6 +446,47 @@ function handleTouchEnd(event) {
     }
 }
 
+function saveGame() {
+    const gameState = {
+        board: board,
+        score: score,
+        previousState: previousState,
+        gameOver: gameOver
+    };
+
+    localStorage.setItem(
+        GAME_STORAGE_KEY,
+        JSON.stringify(gameState)
+    );
+}
+
+function loadGame() {
+    const savedGame = localStorage.getItem(GAME_STORAGE_KEY);
+
+    if (!savedGame) {
+        startGame();
+        return;
+    }
+
+    const gameState = JSON.parse(savedGame);
+
+    board = gameState.board;
+    score = gameState.score;
+    previousState = gameState.previousState;
+    gameOver = gameState.gameOver;
+
+    createBoardCells();
+    renderBoard();
+
+    undoButton.disabled = !previousState || gameOver;
+
+    if (gameOver) {
+        finishGame();
+    } else {
+        closeGameOver();
+    }
+}
+
 function startGame() {
     board = createEmptyBoard();
     score = 0;
@@ -454,6 +500,8 @@ function startGame() {
     createBoardCells();
     addInitialTiles();
     renderBoard();
+
+    saveGame();
 }
 
 document.addEventListener("keydown", handleKeydown);
@@ -465,4 +513,4 @@ restartButton.addEventListener("click", startGame);
 gameOverRestartButton.addEventListener("click", startGame);
 undoButton.addEventListener("click", undoMove);
 
-startGame();
+loadGame();
