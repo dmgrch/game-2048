@@ -144,6 +144,8 @@ button {
     width: 100%;
     aspect-ratio: 1;
 
+    touch-action: none;
+
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     grid-template-rows: repeat(4, 1fr);
