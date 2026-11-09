@@ -12,6 +12,18 @@ body {
     color: #776e65;
 }
 
-main {
-    padding: 40px;
+.game {
+    padding: 40px 20px;
+}
+
+.game__container {
+    width: 100%;
+    max-width: 520px;
+
+    margin: 0 auto;
+}
+
+.game-over-overlay,
+.leaderboard-overlay {
+    display: none;
 }

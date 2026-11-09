@@ -11,9 +11,110 @@
 
 <body>
 
-    <main>
-        <h1>2048</h1>
+    <main class="game">
+        <div class="game__container">
+
+            <header class="game__header">
+                <div>
+                    <h1 class="game__title">2048</h1>
+                    <p class="game__subtitle">
+                        Соединяйте одинаковые плитки и наберите как можно больше очков
+                    </p>
+                </div>
+
+                <div class="score">
+                    <span class="score__label">Очки</span>
+                    <strong class="score__value">0</strong>
+                </div>
+            </header>
+
+            <section class="game__actions">
+                <button class="game__button restart-button" type="button">
+                    Новая игра
+                </button>
+
+                <button class="game__button undo-button" type="button" disabled>
+                    Отменить ход
+                </button>
+
+                <button class="game__button leaderboard-button" type="button">
+                    Лидеры
+                </button>
+            </section>
+
+            <section class="game-board-section">
+                <div class="game-board"></div>
+            </section>
+
+        </div>
     </main>
+
+    <div class="game-over-overlay">
+        <section class="game-over">
+            <h2 class="game-over__title">Игра окончена!</h2>
+
+            <p class="game-over__score">
+                Ваш результат:
+                <strong class="game-over__score-value">0</strong>
+            </p>
+
+            <form class="game-over__form">
+                <label class="game-over__field">
+                    <span>Ваше имя</span>
+
+                    <input
+                        class="game-over__input"
+                        type="text"
+                        name="playerName"
+                        maxlength="20"
+                        required
+                    >
+                </label>
+
+                <button class="game-over__save" type="submit">
+                    Сохранить результат
+                </button>
+            </form>
+
+            <p class="game-over__saved">
+                Ваш рекорд сохранен!
+            </p>
+
+            <button class="game-over__restart" type="button">
+                Начать заново
+            </button>
+        </section>
+    </div>
+
+    <div class="leaderboard-overlay">
+        <section class="leaderboard">
+            <div class="leaderboard__header">
+                <h2>Таблица лидеров</h2>
+
+                <button class="leaderboard__close" type="button">
+                    X
+                </button>
+            </div>
+
+            <div class="leaderboard__table-wrapper">
+                <table class="leaderboard__table">
+                    <thead>
+                        <tr>
+                            <th>Имя</th>
+                            <th>Очки</th>
+                            <th>Дата</th>
+                        </tr>
+                    </thead>
+
+                    <tbody class="leaderboard__body"></tbody>
+                </table>
+            </div>
+
+            <p class="leaderboard__empty">
+                Сохраненных результатов пока нет
+            </p>
+        </section>
+    </div>
 
     <script src="js/script.js"></script>
 </body>
