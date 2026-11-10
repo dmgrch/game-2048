@@ -333,6 +333,10 @@ button {
     gap: 16px;
 }
 
+.game-over__form--hidden {
+    display: none;
+}
+
 .game-over__field {
     display: flex;
     flex-direction: column;

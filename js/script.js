@@ -6,13 +6,29 @@ const gameOverOverlay = document.querySelector(".game-over-overlay");
 const gameOverScoreValue = document.querySelector(".game-over__score-value");
 const gameOverRestartButton = document.querySelector(".game-over__restart");
 
+const leaderboardButton = document.querySelector(".leaderboard-button");
+const leaderboardOverlay = document.querySelector(".leaderboard-overlay");
+const leaderboardCloseButton = document.querySelector(".leaderboard__close");
+const leaderboardBody = document.querySelector(".leaderboard__body");
+const leaderboardTableWrapper = document.querySelector(".leaderboard__table-wrapper");
+const leaderboardEmpty = document.querySelector(".leaderboard__empty");
+
+const gameOverForm = document.querySelector(".game-over__form");
+const gameOverInput = document.querySelector(".game-over__input");
+const gameOverSaved = document.querySelector(".game-over__saved");
+
 const BOARD_SIZE = 4;
 const GAME_STORAGE_KEY = "game2048";
+const LEADERBOARD_STORAGE_KEY = "game2048Leaderboard";
 
 let board = [];
 let score = 0;
 let previousState = null;
 let gameOver = false;
+
+let resultSaved = false;
+let leaderboardOpen = false;
+
 let touchStartX = 0;
 let touchStartY = 0;
 
@@ -310,6 +326,9 @@ function finishGame() {
     undoButton.disabled = true;
 
     gameOverScoreValue.textContent = score;
+
+    updateGameOverContent();
+
     gameOverOverlay.classList.add("game-over-overlay--open");
 }
 
@@ -388,6 +407,15 @@ function undoMove() {
 }
 
 function handleKeydown(event) {
+    if (event.key === "Escape" && leaderboardOpen) {
+        closeLeaderboard();
+        return;
+    }
+
+    if (leaderboardOpen || gameOver) {
+        return;
+    }
+
     const directions = {
         ArrowLeft: "left",
         ArrowRight: "right",
@@ -407,6 +435,10 @@ function handleKeydown(event) {
 }
 
 function handleTouchStart(event) {
+    if (leaderboardOpen || gameOver) {
+        return;
+    }
+
     const touch = event.changedTouches[0];
 
     touchStartX = touch.clientX;
@@ -414,6 +446,10 @@ function handleTouchStart(event) {
 }
 
 function handleTouchEnd(event) {
+    if (leaderboardOpen || gameOver) {
+        return;
+    }
+
     const touch = event.changedTouches[0];
 
     const differenceX = touch.clientX - touchStartX;
@@ -446,12 +482,134 @@ function handleTouchEnd(event) {
     }
 }
 
+function updateGameOverContent() {
+    if (resultSaved) {
+        gameOverForm.classList.add("game-over__form--hidden");
+        gameOverSaved.classList.add("game-over__saved--visible");
+    } else {
+        gameOverForm.classList.remove("game-over__form--hidden");
+        gameOverSaved.classList.remove("game-over__saved--visible");
+    }
+}
+
+function getLeaderboard() {
+    return JSON.parse(
+        localStorage.getItem(LEADERBOARD_STORAGE_KEY)
+    ) || [];
+}
+
+function saveLeaderboard(records) {
+    localStorage.setItem(
+        LEADERBOARD_STORAGE_KEY,
+        JSON.stringify(records)
+    );
+}
+
+function createLeaderboardRow(record) {
+    const row = document.createElement("tr");
+
+    const nameCell = document.createElement("td");
+    const scoreCell = document.createElement("td");
+    const dateCell = document.createElement("td");
+
+    nameCell.textContent = record.name;
+    scoreCell.textContent = record.score;
+    dateCell.textContent = record.date;
+
+    row.append(nameCell, scoreCell, dateCell);
+
+    return row;
+}
+
+function renderLeaderboard() {
+    const records = getLeaderboard();
+
+    leaderboardBody.replaceChildren();
+
+    if (records.length === 0) {
+        leaderboardTableWrapper.style.display = "none";
+        leaderboardEmpty.style.display = "block";
+
+        return;
+    }
+
+    leaderboardTableWrapper.style.display = "block";
+    leaderboardEmpty.style.display = "none";
+
+    records.forEach((record) => {
+        const row = createLeaderboardRow(record);
+
+        leaderboardBody.append(row);
+    });
+}
+
+function saveResult(name) {
+    const records = getLeaderboard();
+
+    const newRecord = {
+        name: name,
+        score: score,
+        date: new Date().toLocaleDateString("ru-RU")
+    };
+
+    records.push(newRecord);
+
+    records.sort((firstRecord, secondRecord) => {
+        return secondRecord.score - firstRecord.score;
+    });
+
+    const topRecords = records.slice(0, 10);
+
+    saveLeaderboard(topRecords);
+
+    resultSaved = true;
+
+    updateGameOverContent();
+    renderLeaderboard();
+    saveGame();
+}
+
+function handleGameOverSubmit(event) {
+    event.preventDefault();
+
+    if (resultSaved) {
+        return;
+    }
+
+    const playerName = gameOverInput.value.trim();
+
+    if (!playerName) {
+        return;
+    }
+
+    saveResult(playerName);
+}
+
+function openLeaderboard() {
+    leaderboardOpen = true;
+
+    renderLeaderboard();
+
+    leaderboardOverlay.classList.add(
+        "leaderboard-overlay--open"
+    );
+}
+
+function closeLeaderboard() {
+    leaderboardOpen = false;
+
+    leaderboardOverlay.classList.remove(
+        "leaderboard-overlay--open"
+    );
+}
+
 function saveGame() {
     const gameState = {
         board: board,
         score: score,
         previousState: previousState,
-        gameOver: gameOver
+        gameOver: gameOver,
+        resultSaved: resultSaved
     };
 
     localStorage.setItem(
@@ -474,6 +632,7 @@ function loadGame() {
     score = gameState.score;
     previousState = gameState.previousState;
     gameOver = gameState.gameOver;
+    resultSaved = gameState.resultSaved || false;
 
     createBoardCells();
     renderBoard();
@@ -492,8 +651,12 @@ function startGame() {
     score = 0;
     previousState = null;
     gameOver = false;
+    resultSaved = false;
+
+    gameOverInput.value = "";
 
     closeGameOver();
+    updateGameOverContent();
 
     undoButton.disabled = true;
 
@@ -512,5 +675,13 @@ gameBoard.addEventListener("touchend", handleTouchEnd);
 restartButton.addEventListener("click", startGame);
 gameOverRestartButton.addEventListener("click", startGame);
 undoButton.addEventListener("click", undoMove);
+
+leaderboardButton.addEventListener("click", openLeaderboard);
+leaderboardCloseButton.addEventListener("click", closeLeaderboard);
+
+gameOverForm.addEventListener(
+    "submit",
+    handleGameOverSubmit
+);
 
 loadGame();
