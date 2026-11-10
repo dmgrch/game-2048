@@ -20,6 +20,7 @@ const gameOverSaved = document.querySelector(".game-over__saved");
 const BOARD_SIZE = 4;
 const GAME_STORAGE_KEY = "game2048";
 const LEADERBOARD_STORAGE_KEY = "game2048Leaderboard";
+const ANIMATION_DURATION = 180;
 
 let board = [];
 let score = 0;
@@ -31,6 +32,8 @@ let leaderboardOpen = false;
 
 let touchStartX = 0;
 let touchStartY = 0;
+
+let isAnimating = false;
 
 const SWIPE_DISTANCE = 40;
 
@@ -85,7 +88,7 @@ function addRandomTile() {
     const emptyCells = getEmptyCells();
 
     if (emptyCells.length === 0) {
-        return;
+        return null;
     }
 
     const randomIndex = Math.floor(
@@ -96,6 +99,8 @@ function addRandomTile() {
 
     board[randomCell.row][randomCell.column] =
         getRandomTileValue();
+
+    return randomCell;
 }
 
 function addInitialTiles() {
@@ -108,10 +113,17 @@ function addInitialTiles() {
 
 function addRandomTiles() {
     const tilesCount = Math.floor(Math.random() * 2) + 1;
+    const newTiles = [];
 
     for (let i = 0; i < tilesCount; i++) {
-        addRandomTile();
+        const newTile = addRandomTile();
+
+        if (newTile) {
+            newTiles.push(newTile);
+        }
     }
+
+    return newTiles;
 }
 
 function createTile(value) {
@@ -152,28 +164,60 @@ function renderBoard() {
 }
 
 function processLine(line) {
-    const values = line.filter((value) => value !== 0);
+    const values = [];
+
+    for (let index = 0; index < line.length; index++) {
+        if (line[index] !== 0) {
+            values.push({
+                value: line[index],
+                sourceIndex: index
+            });
+        }
+    }
 
     const mergedLine = [];
+    const moves = [];
+
     let scoreGain = 0;
     let index = 0;
+    let targetIndex = 0;
 
     while (index < values.length) {
         if (
             index + 1 < values.length &&
-            values[index] === values[index + 1]
+            values[index].value === values[index + 1].value
         ) {
-            const mergedValue = values[index] * 2;
+            const mergedValue = values[index].value * 2;
 
             mergedLine.push(mergedValue);
             scoreGain += mergedValue;
 
+            moves.push({
+                fromIndex: values[index].sourceIndex,
+                toIndex: targetIndex,
+                merged: true
+            });
+
+            moves.push({
+                fromIndex: values[index + 1].sourceIndex,
+                toIndex: targetIndex,
+                merged: true
+            });
+
             index += 2;
         } else {
-            mergedLine.push(values[index]);
+            mergedLine.push(values[index].value);
+
+            moves.push({
+                fromIndex: values[index].sourceIndex,
+                toIndex: targetIndex,
+                merged: false
+            });
 
             index += 1;
         }
+
+        targetIndex += 1;
     }
 
     while (mergedLine.length < BOARD_SIZE) {
@@ -182,12 +226,15 @@ function processLine(line) {
 
     return {
         line: mergedLine,
-        scoreGain: scoreGain
+        scoreGain: scoreGain,
+        moves: moves
     };
 }
 
 function moveLeft(sourceBoard) {
     const newBoard = [];
+    const moves = [];
+
     let scoreGain = 0;
 
     for (let row = 0; row < BOARD_SIZE; row++) {
@@ -195,16 +242,29 @@ function moveLeft(sourceBoard) {
 
         newBoard.push(result.line);
         scoreGain += result.scoreGain;
+
+        result.moves.forEach((tileMove) => {
+            moves.push({
+                fromRow: row,
+                fromColumn: tileMove.fromIndex,
+                toRow: row,
+                toColumn: tileMove.toIndex,
+                merged: tileMove.merged
+            });
+        });
     }
 
     return {
         board: newBoard,
-        scoreGain: scoreGain
+        scoreGain: scoreGain,
+        moves: moves
     };
 }
 
 function moveRight(sourceBoard) {
     const newBoard = [];
+    const moves = [];
+
     let scoreGain = 0;
 
     for (let row = 0; row < BOARD_SIZE; row++) {
@@ -212,18 +272,31 @@ function moveRight(sourceBoard) {
 
         const result = processLine(reversedRow);
 
-        newBoard.push(result.line.reverse());
+        newBoard.push([...result.line].reverse());
         scoreGain += result.scoreGain;
+
+        result.moves.forEach((tileMove) => {
+            moves.push({
+                fromRow: row,
+                fromColumn: BOARD_SIZE - 1 - tileMove.fromIndex,
+                toRow: row,
+                toColumn: BOARD_SIZE - 1 - tileMove.toIndex,
+                merged: tileMove.merged
+            });
+        });
     }
 
     return {
         board: newBoard,
-        scoreGain: scoreGain
+        scoreGain: scoreGain,
+        moves: moves
     };
 }
 
 function moveUp(sourceBoard) {
     const newBoard = createEmptyBoard();
+    const moves = [];
+
     let scoreGain = 0;
 
     for (let column = 0; column < BOARD_SIZE; column++) {
@@ -239,17 +312,30 @@ function moveUp(sourceBoard) {
             newBoard[row][column] = result.line[row];
         }
 
+        result.moves.forEach((tileMove) => {
+            moves.push({
+                fromRow: tileMove.fromIndex,
+                fromColumn: column,
+                toRow: tileMove.toIndex,
+                toColumn: column,
+                merged: tileMove.merged
+            });
+        });
+
         scoreGain += result.scoreGain;
     }
 
     return {
         board: newBoard,
-        scoreGain: scoreGain
+        scoreGain: scoreGain,
+        moves: moves
     };
 }
 
 function moveDown(sourceBoard) {
     const newBoard = createEmptyBoard();
+    const moves = [];
+
     let scoreGain = 0;
 
     for (let column = 0; column < BOARD_SIZE; column++) {
@@ -260,19 +346,29 @@ function moveDown(sourceBoard) {
         }
 
         const result = processLine(columnValues);
-
-        result.line.reverse();
+        const finalColumn = [...result.line].reverse();
 
         for (let row = 0; row < BOARD_SIZE; row++) {
-            newBoard[row][column] = result.line[row];
+            newBoard[row][column] = finalColumn[row];
         }
+
+        result.moves.forEach((tileMove) => {
+            moves.push({
+                fromRow: BOARD_SIZE - 1 - tileMove.fromIndex,
+                fromColumn: column,
+                toRow: BOARD_SIZE - 1 - tileMove.toIndex,
+                toColumn: column,
+                merged: tileMove.merged
+            });
+        });
 
         scoreGain += result.scoreGain;
     }
 
     return {
         board: newBoard,
-        scoreGain: scoreGain
+        scoreGain: scoreGain,
+        moves: moves
     };
 }
 
@@ -336,8 +432,120 @@ function closeGameOver() {
     gameOverOverlay.classList.remove("game-over-overlay--open");
 }
 
-function move(direction) {
-    if (gameOver) {
+function animateTileMovement(moves) {
+    const cells = gameBoard.querySelectorAll(".game-cell");
+    const animations = [];
+
+    moves.forEach((tileMove) => {
+        if (
+            tileMove.fromRow === tileMove.toRow &&
+            tileMove.fromColumn === tileMove.toColumn
+        ) {
+            return;
+        }
+
+        const sourceIndex =
+            tileMove.fromRow * BOARD_SIZE +
+            tileMove.fromColumn;
+
+        const targetIndex =
+            tileMove.toRow * BOARD_SIZE +
+            tileMove.toColumn;
+
+        const sourceCell = cells[sourceIndex];
+        const targetCell = cells[targetIndex];
+
+        const tile = sourceCell.querySelector(".tile");
+
+        if (!tile) {
+            return;
+        }
+
+        const sourceRect = sourceCell.getBoundingClientRect();
+        const targetRect = targetCell.getBoundingClientRect();
+
+        animations.push({
+            tile: tile,
+            x: targetRect.left - sourceRect.left,
+            y: targetRect.top - sourceRect.top
+        });
+    });
+
+    if (animations.length === 0) {
+        return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+        requestAnimationFrame(() => {
+            animations.forEach((animation) => {
+                animation.tile.classList.add("tile--moving");
+
+                animation.tile.style.transform =
+                    `translate(${animation.x}px, ${animation.y}px)`;
+            });
+
+            setTimeout(resolve, ANIMATION_DURATION);
+        });
+    });
+}
+
+function getMergedCells(moves) {
+    const mergedCells = [];
+    const addedCells = new Set();
+
+    moves.forEach((tileMove) => {
+        if (!tileMove.merged) {
+            return;
+        }
+
+        const key =
+            `${tileMove.toRow}-${tileMove.toColumn}`;
+
+        if (addedCells.has(key)) {
+            return;
+        }
+
+        addedCells.add(key);
+
+        mergedCells.push({
+            row: tileMove.toRow,
+            column: tileMove.toColumn
+        });
+    });
+
+    return mergedCells;
+}
+
+function animateRenderedTiles(newTiles, mergedCells) {
+    const cells = gameBoard.querySelectorAll(".game-cell");
+
+    newTiles.forEach((position) => {
+        const index =
+            position.row * BOARD_SIZE +
+            position.column;
+
+        const tile = cells[index].querySelector(".tile");
+
+        if (tile) {
+            tile.classList.add("tile--new");
+        }
+    });
+
+    mergedCells.forEach((position) => {
+        const index =
+            position.row * BOARD_SIZE +
+            position.column;
+
+        const tile = cells[index].querySelector(".tile");
+
+        if (tile) {
+            tile.classList.add("tile--merged");
+        }
+    });
+}
+
+async function move(direction) {
+    if (gameOver || leaderboardOpen || isAnimating) {
         return false;
     }
 
@@ -364,6 +572,11 @@ function move(direction) {
     }
 
     if (boardsAreEqual(board, result.board)) {
+        if (!hasAvailableMoves()) {
+            finishGame();
+            saveGame();
+        }
+
         return false;
     }
 
@@ -372,11 +585,19 @@ function move(direction) {
         score: score
     };
 
+    isAnimating = true;
+
+    const mergedCells = getMergedCells(result.moves);
+
+    await animateTileMovement(result.moves);
+
     board = result.board;
     score += result.scoreGain;
 
-    addRandomTiles();
+    const newTiles = addRandomTiles();
+
     renderBoard();
+    animateRenderedTiles(newTiles, mergedCells);
 
     undoButton.disabled = false;
 
@@ -386,11 +607,17 @@ function move(direction) {
 
     saveGame();
 
+    isAnimating = false;
+
     return true;
 }
 
 function undoMove() {
-    if (!previousState || gameOver) {
+    if (
+        !previousState ||
+        gameOver ||
+        isAnimating
+    ) {
         return;
     }
 
